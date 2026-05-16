@@ -1,4 +1,5 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const fs = require("fs");
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("./session");
@@ -15,35 +16,21 @@ async function startBot() {
         const { connection, lastDisconnect } = update;
 
         if (connection === "open") {
-            console.log("✅ Bot connected successfully");
+            console.log("✅ Connected");
         }
 
         if (connection === "close") {
-            const reason =
-                lastDisconnect?.error?.output?.statusCode;
+            const reason = lastDisconnect?.error?.output?.statusCode;
 
-            console.log("❌ Disconnected. Reason:", reason);
+            console.log("❌ Closed reason:", reason);
 
-            // auto-reconnect
-            if (reason !== DisconnectReason.loggedOut) {
-                startBot();
-            } else {
-                console.log("⚠️ Logged out. Re-scan QR needed.");
+            // IMPORTANT FIX: prevent infinite loop crash
+            if (reason === DisconnectReason.loggedOut) {
+                console.log("⚠️ Session logged out. Delete /session and rescan QR.");
+                return;
             }
-        }
-    });
 
-    // simple test command
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-        const msg = messages[0];
-        if (!msg.message) return;
-
-        const text =
-            msg.message.conversation ||
-            msg.message.extendedTextMessage?.text;
-
-        if (text === "ping") {
-            await sock.sendMessage(msg.key.remoteJid, { text: "pong ✅" });
+            setTimeout(startBot, 3000);
         }
     });
 }
