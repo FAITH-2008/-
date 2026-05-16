@@ -20,7 +20,12 @@ async function startBot() {
         auth: state,
         printQRInTerminal: false,
         logger: P({ level: "silent" })
-    });
+    }); const sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: false,
+    logger: P({ level: "silent" }),
+    browser: ["Shadow Bot", "Chrome", "1.0.0"]
+});
 
     sock.ev.on("creds.update", saveCreds)
         ;// Pairing code
