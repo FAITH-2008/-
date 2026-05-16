@@ -14,64 +14,51 @@ app.listen(PORT, () => {
 });
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState("auth");
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState("auth");
 
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false,
-        logger: P({ level: "silent" })
-    }); const sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: false,
-    logger: P({ level: "silent" }),
-    browser: ["Shadow Bot", "Chrome", "1.0.0"]
-});
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            logger: P({ level: "silent" })
+        });
 
-    sock.ev.on("creds.update", saveCreds)
-        ;// Pairing code
-if (!sock.authState.creds.registered) {
-    const code = await sock.requestPairingCode("2348121254551");
+        sock.ev.on("creds.update", saveCreds);
 
-    console.log("📱 PAIRING CODE:");
-    console.log(code);
-}
+        sock.ev.on("connection.update", (update) => {
+            const { connection } = update;
 
-    sock.ev.on("connection.update", (update) => {
-        const { connection } = update;
+            if (connection === "open") {
+                console.log("✅ Bot connected");
+            }
 
-        if (connection === "open") {
-            console.log("✅ Bot connected");
-        }
+            if (connection === "close") {
+                console.log("❌ Bot disconnected");
+            }
+        });
 
-        if (connection === "close") {
-            console.log("❌ Bot disconnected");
-        }
-    });
+        sock.ev.on("messages.upsert", async ({ messages }) => {
+            const msg = messages[0];
+            if (!msg.message) return;
 
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-        const msg = messages[0];
-        if (!msg.message) return;
+            const text =
+                msg.message.conversation ||
+                msg.message.extendedTextMessage?.text;
 
-        const text =
-            msg.message.conversation ||
-            msg.message.extendedTextMessage?.text;
+            const sender = msg.key.remoteJid;
 
-        const sender = msg.key.remoteJid;
+            if (text === "/ping") {
+                await sock.sendMessage(sender, { text: "🏓 Pong!" });
+            }
 
-        console.log("Message:", text);
+            if (text === "/start") {
+                await sock.sendMessage(sender, { text: "👋 Bot is alive ⚡" });
+            }
+        });
 
-        if (text === "/start") {
-            await sock.sendMessage(sender, {
-                text: "👋 Hello! Bot is alive ⚡"
-            });
-        }
-
-        if (text === "/ping") {
-            await sock.sendMessage(sender, {
-                text: "🏓 Pong!"
-            });
-        }
-    });
+    } catch (err) {
+        console.log("❌ Bot crash error:", err);
+    }
 }
 
 startBot();
