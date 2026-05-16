@@ -1,37 +1,50 @@
-import express from "express";
-import makeWASocket, { useMultiFileAuthState } from "@whiskeysockets/baileys";
-import P from "pino";
+import makeWASocket, { DisconnectReason } from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import express from 'express';
 
 const app = express();
-
-app.get("/", (req, res) => {
-    res.send("Bot is alive");
-});
-
-app.listen(3000, () => console.log("Server running"));
+const PORT = process.env.PORT || 3000;
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState("auth");
+  const sock = makeWASocket({
+    auth: undefined, // Will be set after first login
+    printQRInTerminal: true, // Shows QR code in terminal
+  });
 
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false,
-        logger: P({ level: "silent" })
-    });
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+    
+    if (connection === 'close') {
+      const shouldReconnect =
+        (lastDisconnect.error instanceof Boom)?.output.statusCode !== DisconnectReason.loggedOut;
+      console.log('connection closed due to', lastDisconnect.error, ', reconnecting ', shouldReconnect);
+      if (shouldReconnect) {
+        startBot();
+      }
+    } else if (connection === 'open') {
+      console.log('✅ Bot connected to WhatsApp!');
+    }
+  });
 
-    sock.ev.on("creds.update", saveCreds);
+  // Listen for incoming messages
+  sock.ev.on('messages.upsert', async (m) => {
+    const msg = m.messages[0];
+    if (!msg.message) return;
 
-    sock.ev.on("connection.update", (update) => {
-        const { connection } = update;
+    console.log('📨 New message from', msg.key.remoteJid);
+    
+    // Echo message back (replace with your bot logic)
+    await sock.sendMessage(msg.key.remoteJid, { text: 'Hello! Message received.' });
+  });
 
-        if (connection === "open") {
-            console.log("✅ Bot connected");
-        }
-
-        if (connection === "close") {
-            console.log("❌ Bot disconnected");
-        }
-    });
+  return sock;
 }
 
-startBot();
+app.get('/', (req, res) => {
+  res.json({ status: 'Bot is running' });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  startBot();
+});
