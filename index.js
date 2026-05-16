@@ -18,11 +18,18 @@ async function startBot() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
+        printQRInTerminal: false,
         logger: P({ level: "silent" })
     });
 
-    sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("creds.update", saveCreds)
+        ;// Pairing code
+if (!sock.authState.creds.registered) {
+    const code = await sock.requestPairingCode("2348121254551");
+
+    console.log("📱 PAIRING CODE:");
+    console.log(code);
+}
 
     sock.ev.on("connection.update", (update) => {
         const { connection } = update;
